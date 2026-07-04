@@ -1,9 +1,19 @@
+name: CI - Kalkulator
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
 jobs:
   ci:
     uses: muhammad0510/ci-templates/.github/workflows/springboot-ci.yml@main
     with:
+      java-version: '21'
       sonar-project-key: YasinMochamad_kalkulator
       sonar-organization: yasinmochamad
       newman-collection: collections/calculator_newman_chain_v3.json
       newman-environment: collections/calculator_newman_chain_env_v2.json
+      app-port: '8080'
     secrets: inherit
