@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: id.co.bni.calculator.controllers.CalculatorControllerTest
+-------------------------------------------------------------------------------
+Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.998 s -- in id.co.bni.calculator.controllers.CalculatorControllerTest
