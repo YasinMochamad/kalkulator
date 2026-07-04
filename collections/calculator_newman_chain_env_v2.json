@@ -1,0 +1,79 @@
+{
+  "id": "newman-chain-env-v2",
+  "name": "Calculator Chain Environment v2",
+  "values": [
+    {
+      "key": "a",
+      "value": "10",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "b",
+      "value": "5",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "multiplyResult",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "divideResult",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "addResult",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "subtractResult",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "multiplyDuration",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "divideDuration",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "addDuration",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "subtractDuration",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "startTime",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

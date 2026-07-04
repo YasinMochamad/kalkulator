@@ -1,0 +1,1203 @@
+{
+  "info": {
+    "_postman_id": "newman-chain-v3-001",
+    "name": "Calculator - Newman Chain v3 (Grouped by Operation)",
+    "description": "Newman Chaining Collection — dikelompokkan per operasi.\n  Urutan folder: Multiply → Divide → Add → Subtract\n  Chain: hasil POST tiap folder jadi nilai 'a' di folder berikutnya.\n  GET (query param & path variable) pakai nilai dari hasil POST folder sebelumnya.\n  Nilai b tetap 5 di semua step. Nilai awal: a=10, b=5.\n  Logging: request header, request body, response header, response body, duration.\nGenerated: springboot-generator MCP v7.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Perkalian (Multiply)",
+      "description": "Folder Multiply — 3 cara input. Nilai awal a=10, b=5.\nHasil POST akan menjadi nilai 'a' di folder Divide.",
+      "item": [
+        {
+          "name": "1a. POST /api/calculator/multiply (Body)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var a = pm.environment.get('a');",
+                  "var b = pm.environment.get('b');",
+                  "var rawBody = pm.request.body.raw;",
+                  "var resolvedBody = pm.variables.replaceIn(rawBody);",
+                  "",
+                  "console.log('');",
+                  "console.log('══════════════════════════════════════════════════');",
+                  "console.log('📁 FOLDER: PERKALIAN (MULTIPLY)');",
+                  "console.log('══════════════════════════════════════════════════');",
+                  "console.log('[1a] POST MULTIPLY — REQUEST');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Method : POST');",
+                  "console.log('  URL    : ' + pm.request.url.toString());",
+                  "console.log('  [INFO] a = ' + a + ', b = ' + b);",
+                  "console.log('');",
+                  "console.log('  >> Request Headers:');",
+                  "pm.request.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Request Body (resolved):');",
+                  "console.log('     ' + resolvedBody);",
+                  "try {",
+                  "    var bodyObj = JSON.parse(resolvedBody);",
+                  "    console.log('     → a = ' + bodyObj.a);",
+                  "    console.log('     → b = ' + bodyObj.b);",
+                  "} catch(e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var duration = pm.response.responseTime;",
+                  "var inputA = parseFloat(pm.environment.get('a'));",
+                  "var inputB = parseFloat(pm.environment.get('b'));",
+                  "pm.environment.set('multiplyResultDuration', duration);",
+                  "",
+                  "console.log('');",
+                  "console.log('[1a] POST MULTIPLY — RESPONSE');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Status   : ' + pm.response.status + ' (' + pm.response.code + ')');",
+                  "console.log('  Duration : ' + duration + ' ms');",
+                  "console.log('');",
+                  "console.log('  >> Response Headers:');",
+                  "pm.response.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Response Body:');",
+                  "console.log('     ' + pm.response.text());",
+                  "console.log('');",
+                  "",
+                  "pm.test('[1a][Multiply] Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('[1a][Multiply] success = true', function () { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('[1a][Multiply] payload adalah angka', function () { pm.expect(jsonData.payload).to.be.a('number'); });",
+                  "pm.test('[1a][Multiply] ' + inputA + ' x ' + inputB + ' = ' + (inputA * inputB), function () {",
+                  "    pm.expect(jsonData.payload).to.eql(inputA * inputB);",
+                  "});",
+                  "",
+                  "pm.environment.set('multiplyResult', jsonData.payload);",
+                  "console.log('[CHAIN] multiplyResult = ' + jsonData.payload);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/multiply",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "calculator",
+                "multiply"
+              ]
+            },
+            "description": "POST via Request Body. Nilai awal a=10, b=5.\nHasil → multiplyResult → jadi nilai a di Divide.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"a\": {{a}},\n  \"b\": {{b}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1b. GET /api/calculator/multiply?a=10&b=5 (Query Param)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var a = pm.environment.get('a');",
+                  "var b = pm.environment.get('b');",
+                  "var resolvedUrl = pm.variables.replaceIn(pm.request.url.toString());",
+                  "",
+                  "console.log('');",
+                  "console.log('[1b] GET MULTIPLY (Query Param) — REQUEST');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Method : GET');",
+                  "console.log('  URL (resolved): ' + resolvedUrl);",
+                  "console.log('  [INFO] a = ' + a + ', b = ' + b);",
+                  "console.log('     → a = ' + a);",
+                  "console.log('     → b = ' + b);",
+                  "console.log('');",
+                  "console.log('  >> Request Headers:');",
+                  "pm.request.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var duration = pm.response.responseTime;",
+                  "var inputA = parseFloat(pm.environment.get('a'));",
+                  "var inputB = parseFloat(pm.environment.get('b'));",
+                  "",
+                  "console.log('');",
+                  "console.log('[1b] GET MULTIPLY (Query Param) — RESPONSE');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Status   : ' + pm.response.status + ' (' + pm.response.code + ')');",
+                  "console.log('  Duration : ' + duration + ' ms');",
+                  "console.log('');",
+                  "console.log('  >> Response Headers:');",
+                  "pm.response.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Response Body:');",
+                  "console.log('     ' + pm.response.text());",
+                  "console.log('');",
+                  "",
+                  "pm.test('[1b][Multiply] Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('[1b][Multiply] success = true', function () { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('[1b][Multiply] payload adalah angka', function () { pm.expect(jsonData.payload).to.be.a('number'); });",
+                  "pm.test('[1b][Multiply] ' + inputA + ' x ' + inputB + ' = ' + (inputA * inputB), function () {",
+                  "    pm.expect(jsonData.payload).to.eql(inputA * inputB);",
+                  "});",
+                  "",
+                  "pm.environment.set('multiplyResult', jsonData.payload);",
+                  "console.log('[CHAIN] multiplyResult = ' + jsonData.payload + ' (dari Query Param)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/multiply?a={{a}}&b={{b}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "calculator",
+                "multiply"
+              ],
+              "query": [
+                {
+                  "key": "a",
+                  "value": "{{a}}"
+                },
+                {
+                  "key": "b",
+                  "value": "{{b}}"
+                }
+              ]
+            },
+            "description": "GET via Query Param. Nilai a=10, b=5 (nilai awal, sama seperti POST)."
+          },
+          "response": []
+        },
+        {
+          "name": "1c. GET /api/calculator/multiply/10/5 (Path Variable)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var a = pm.environment.get('a');",
+                  "var b = pm.environment.get('b');",
+                  "var resolvedUrl = pm.variables.replaceIn(pm.request.url.toString());",
+                  "",
+                  "console.log('');",
+                  "console.log('[1c] GET MULTIPLY (Path Variable) — REQUEST');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Method : GET');",
+                  "console.log('  URL (resolved): ' + resolvedUrl);",
+                  "console.log('  [INFO] a = ' + a + ', b = ' + b);",
+                  "console.log('     → a = ' + a);",
+                  "console.log('     → b = ' + b);",
+                  "console.log('');",
+                  "console.log('  >> Request Headers:');",
+                  "pm.request.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var duration = pm.response.responseTime;",
+                  "var inputA = parseFloat(pm.environment.get('a'));",
+                  "var inputB = parseFloat(pm.environment.get('b'));",
+                  "",
+                  "console.log('');",
+                  "console.log('[1c] GET MULTIPLY (Path Variable) — RESPONSE');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Status   : ' + pm.response.status + ' (' + pm.response.code + ')');",
+                  "console.log('  Duration : ' + duration + ' ms');",
+                  "console.log('');",
+                  "console.log('  >> Response Headers:');",
+                  "pm.response.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Response Body:');",
+                  "console.log('     ' + pm.response.text());",
+                  "console.log('');",
+                  "",
+                  "pm.test('[1c][Multiply] Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('[1c][Multiply] success = true', function () { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('[1c][Multiply] payload adalah angka', function () { pm.expect(jsonData.payload).to.be.a('number'); });",
+                  "pm.test('[1c][Multiply] ' + inputA + ' x ' + inputB + ' = ' + (inputA * inputB), function () {",
+                  "    pm.expect(jsonData.payload).to.eql(inputA * inputB);",
+                  "});",
+                  "",
+                  "pm.environment.set('multiplyResult', jsonData.payload);",
+                  "console.log('[CHAIN] multiplyResult = ' + jsonData.payload + ' (dari Path Variable)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/multiply/{{a}}/{{b}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "calculator",
+                "multiply",
+                "{{a}}",
+                "{{b}}"
+              ]
+            },
+            "description": "GET via Path Variable. Nilai a=10, b=5 (nilai awal, sama seperti POST)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Pembagian (Divide)",
+      "description": "Folder Divide — 3 cara input.\nNilai a = multiplyResult (hasil POST Multiply), b=5.\nHasil POST akan menjadi nilai 'a' di folder Add.",
+      "item": [
+        {
+          "name": "2a. POST /api/calculator/divide (Body)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var a = pm.environment.get('multiplyResult');",
+                  "var rawBody = pm.request.body.raw;",
+                  "var resolvedBody = pm.variables.replaceIn(rawBody);",
+                  "",
+                  "console.log('');",
+                  "console.log('══════════════════════════════════════════════════');",
+                  "console.log('📁 FOLDER: PEMBAGIAN (DIVIDE)');",
+                  "console.log('══════════════════════════════════════════════════');",
+                  "console.log('[2a] POST DIVIDE — REQUEST');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Method : POST');",
+                  "console.log('  URL    : ' + pm.request.url.toString());",
+                  "console.log('  [INFO] Nilai a = multiplyResult (' + a + ')');",
+                  "console.log('');",
+                  "console.log('  >> Request Headers:');",
+                  "pm.request.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Request Body (resolved):');",
+                  "console.log('     ' + resolvedBody);",
+                  "try {",
+                  "    var bodyObj = JSON.parse(resolvedBody);",
+                  "    console.log('     → a = ' + bodyObj.a);",
+                  "    console.log('     → b = ' + bodyObj.b);",
+                  "} catch(e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var duration = pm.response.responseTime;",
+                  "var inputA = pm.environment.get('multiplyResult');",
+                  "pm.environment.set('divideResultDuration', duration);",
+                  "",
+                  "console.log('');",
+                  "console.log('[2a] POST DIVIDE — RESPONSE');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Status   : ' + pm.response.status + ' (' + pm.response.code + ')');",
+                  "console.log('  Duration : ' + duration + ' ms');",
+                  "console.log('');",
+                  "console.log('  >> Response Headers:');",
+                  "pm.response.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Response Body:');",
+                  "console.log('     ' + pm.response.text());",
+                  "console.log('');",
+                  "",
+                  "pm.test('[2a][Divide] Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('[2a][Divide] success = true', function () { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('[2a][Divide] payload adalah angka', function () { pm.expect(jsonData.payload).to.be.a('number'); });",
+                  "pm.test('[2a][Divide] ' + inputA + ' / 5 = ' + (parseFloat(inputA) / 5), function () {",
+                  "    pm.expect(jsonData.payload).to.eql(parseFloat(inputA) / 5);",
+                  "});",
+                  "",
+                  "pm.environment.set('divideResult', jsonData.payload);",
+                  "console.log('[CHAIN] divideResult = ' + jsonData.payload);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/divide",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "calculator",
+                "divide"
+              ]
+            },
+            "description": "POST via Request Body. a = multiplyResult, b=5.\nHasil → divideResult → jadi nilai a di Add.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"a\": {{multiplyResult}},\n  \"b\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2b. GET /api/calculator/divide?a={{multiplyResult}}&b=5 (Query Param)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var a = pm.environment.get('multiplyResult');",
+                  "var resolvedUrl = pm.variables.replaceIn(pm.request.url.toString());",
+                  "",
+                  "console.log('');",
+                  "console.log('[2b] GET DIVIDE (Query Param) — REQUEST');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Method : GET');",
+                  "console.log('  URL (resolved): ' + resolvedUrl);",
+                  "console.log('  [INFO] Nilai a = multiplyResult (' + a + ')');",
+                  "console.log('     → a = ' + a);",
+                  "console.log('     → b = 5');",
+                  "console.log('');",
+                  "console.log('  >> Request Headers:');",
+                  "pm.request.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var duration = pm.response.responseTime;",
+                  "var inputA = pm.environment.get('multiplyResult');",
+                  "",
+                  "console.log('');",
+                  "console.log('[2b] GET DIVIDE (Query Param) — RESPONSE');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Status   : ' + pm.response.status + ' (' + pm.response.code + ')');",
+                  "console.log('  Duration : ' + duration + ' ms');",
+                  "console.log('');",
+                  "console.log('  >> Response Headers:');",
+                  "pm.response.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Response Body:');",
+                  "console.log('     ' + pm.response.text());",
+                  "console.log('');",
+                  "",
+                  "pm.test('[2b][Divide] Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('[2b][Divide] success = true', function () { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('[2b][Divide] payload adalah angka', function () { pm.expect(jsonData.payload).to.be.a('number'); });",
+                  "pm.test('[2b][Divide] ' + inputA + ' / 5 = ' + (parseFloat(inputA) / 5), function () {",
+                  "    pm.expect(jsonData.payload).to.eql(parseFloat(inputA) / 5);",
+                  "});",
+                  "",
+                  "pm.environment.set('divideResult', jsonData.payload);",
+                  "console.log('[CHAIN] divideResult = ' + jsonData.payload + ' (dari Query Param)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/divide?a={{multiplyResult}}&b=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "calculator",
+                "divide"
+              ],
+              "query": [
+                {
+                  "key": "a",
+                  "value": "{{multiplyResult}}"
+                },
+                {
+                  "key": "b",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "GET via Query Param. a = multiplyResult (hasil POST Multiply), b=5."
+          },
+          "response": []
+        },
+        {
+          "name": "2c. GET /api/calculator/divide/{{multiplyResult}}/5 (Path Variable)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var a = pm.environment.get('multiplyResult');",
+                  "var resolvedUrl = pm.variables.replaceIn(pm.request.url.toString());",
+                  "",
+                  "console.log('');",
+                  "console.log('[2c] GET DIVIDE (Path Variable) — REQUEST');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Method : GET');",
+                  "console.log('  URL (resolved): ' + resolvedUrl);",
+                  "console.log('  [INFO] Nilai a = multiplyResult (' + a + ')');",
+                  "console.log('     → a = ' + a);",
+                  "console.log('     → b = 5');",
+                  "console.log('');",
+                  "console.log('  >> Request Headers:');",
+                  "pm.request.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var duration = pm.response.responseTime;",
+                  "var inputA = pm.environment.get('multiplyResult');",
+                  "",
+                  "console.log('');",
+                  "console.log('[2c] GET DIVIDE (Path Variable) — RESPONSE');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Status   : ' + pm.response.status + ' (' + pm.response.code + ')');",
+                  "console.log('  Duration : ' + duration + ' ms');",
+                  "console.log('');",
+                  "console.log('  >> Response Headers:');",
+                  "pm.response.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Response Body:');",
+                  "console.log('     ' + pm.response.text());",
+                  "console.log('');",
+                  "",
+                  "pm.test('[2c][Divide] Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('[2c][Divide] success = true', function () { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('[2c][Divide] payload adalah angka', function () { pm.expect(jsonData.payload).to.be.a('number'); });",
+                  "pm.test('[2c][Divide] ' + inputA + ' / 5 = ' + (parseFloat(inputA) / 5), function () {",
+                  "    pm.expect(jsonData.payload).to.eql(parseFloat(inputA) / 5);",
+                  "});",
+                  "",
+                  "pm.environment.set('divideResult', jsonData.payload);",
+                  "console.log('[CHAIN] divideResult = ' + jsonData.payload + ' (dari Path Variable)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/divide/{{multiplyResult}}/5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "calculator",
+                "divide",
+                "{{multiplyResult}}",
+                "5"
+              ]
+            },
+            "description": "GET via Path Variable. a = multiplyResult (hasil POST Multiply), b=5."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Penjumlahan (Add)",
+      "description": "Folder Add — 3 cara input.\nNilai a = divideResult (hasil POST Divide), b=5.\nHasil POST akan menjadi nilai 'a' di folder Subtract.",
+      "item": [
+        {
+          "name": "3a. POST /api/calculator/add (Body)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var a = pm.environment.get('divideResult');",
+                  "var rawBody = pm.request.body.raw;",
+                  "var resolvedBody = pm.variables.replaceIn(rawBody);",
+                  "",
+                  "console.log('');",
+                  "console.log('══════════════════════════════════════════════════');",
+                  "console.log('📁 FOLDER: PENJUMLAHAN (ADD)');",
+                  "console.log('══════════════════════════════════════════════════');",
+                  "console.log('[3a] POST ADD — REQUEST');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Method : POST');",
+                  "console.log('  URL    : ' + pm.request.url.toString());",
+                  "console.log('  [INFO] Nilai a = divideResult (' + a + ')');",
+                  "console.log('');",
+                  "console.log('  >> Request Headers:');",
+                  "pm.request.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Request Body (resolved):');",
+                  "console.log('     ' + resolvedBody);",
+                  "try {",
+                  "    var bodyObj = JSON.parse(resolvedBody);",
+                  "    console.log('     → a = ' + bodyObj.a);",
+                  "    console.log('     → b = ' + bodyObj.b);",
+                  "} catch(e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var duration = pm.response.responseTime;",
+                  "var inputA = pm.environment.get('divideResult');",
+                  "pm.environment.set('addResultDuration', duration);",
+                  "",
+                  "console.log('');",
+                  "console.log('[3a] POST ADD — RESPONSE');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Status   : ' + pm.response.status + ' (' + pm.response.code + ')');",
+                  "console.log('  Duration : ' + duration + ' ms');",
+                  "console.log('');",
+                  "console.log('  >> Response Headers:');",
+                  "pm.response.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Response Body:');",
+                  "console.log('     ' + pm.response.text());",
+                  "console.log('');",
+                  "",
+                  "pm.test('[3a][Add] Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('[3a][Add] success = true', function () { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('[3a][Add] payload adalah angka', function () { pm.expect(jsonData.payload).to.be.a('number'); });",
+                  "pm.test('[3a][Add] ' + inputA + ' + 5 = ' + (parseFloat(inputA) + 5), function () {",
+                  "    pm.expect(jsonData.payload).to.eql(parseFloat(inputA) + 5);",
+                  "});",
+                  "",
+                  "pm.environment.set('addResult', jsonData.payload);",
+                  "console.log('[CHAIN] addResult = ' + jsonData.payload);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/add",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "calculator",
+                "add"
+              ]
+            },
+            "description": "POST via Request Body. a = divideResult, b=5.\nHasil → addResult → jadi nilai a di Subtract.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"a\": {{divideResult}},\n  \"b\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3b. GET /api/calculator/add?a={{divideResult}}&b=5 (Query Param)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var a = pm.environment.get('divideResult');",
+                  "var resolvedUrl = pm.variables.replaceIn(pm.request.url.toString());",
+                  "",
+                  "console.log('');",
+                  "console.log('[3b] GET ADD (Query Param) — REQUEST');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Method : GET');",
+                  "console.log('  URL (resolved): ' + resolvedUrl);",
+                  "console.log('  [INFO] Nilai a = divideResult (' + a + ')');",
+                  "console.log('     → a = ' + a);",
+                  "console.log('     → b = 5');",
+                  "console.log('');",
+                  "console.log('  >> Request Headers:');",
+                  "pm.request.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var duration = pm.response.responseTime;",
+                  "var inputA = pm.environment.get('divideResult');",
+                  "",
+                  "console.log('');",
+                  "console.log('[3b] GET ADD (Query Param) — RESPONSE');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Status   : ' + pm.response.status + ' (' + pm.response.code + ')');",
+                  "console.log('  Duration : ' + duration + ' ms');",
+                  "console.log('');",
+                  "console.log('  >> Response Headers:');",
+                  "pm.response.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Response Body:');",
+                  "console.log('     ' + pm.response.text());",
+                  "console.log('');",
+                  "",
+                  "pm.test('[3b][Add] Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('[3b][Add] success = true', function () { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('[3b][Add] payload adalah angka', function () { pm.expect(jsonData.payload).to.be.a('number'); });",
+                  "pm.test('[3b][Add] ' + inputA + ' + 5 = ' + (parseFloat(inputA) + 5), function () {",
+                  "    pm.expect(jsonData.payload).to.eql(parseFloat(inputA) + 5);",
+                  "});",
+                  "",
+                  "pm.environment.set('addResult', jsonData.payload);",
+                  "console.log('[CHAIN] addResult = ' + jsonData.payload + ' (dari Query Param)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/add?a={{divideResult}}&b=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "calculator",
+                "add"
+              ],
+              "query": [
+                {
+                  "key": "a",
+                  "value": "{{divideResult}}"
+                },
+                {
+                  "key": "b",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "GET via Query Param. a = divideResult (hasil POST Divide), b=5."
+          },
+          "response": []
+        },
+        {
+          "name": "3c. GET /api/calculator/add/{{divideResult}}/5 (Path Variable)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var a = pm.environment.get('divideResult');",
+                  "var resolvedUrl = pm.variables.replaceIn(pm.request.url.toString());",
+                  "",
+                  "console.log('');",
+                  "console.log('[3c] GET ADD (Path Variable) — REQUEST');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Method : GET');",
+                  "console.log('  URL (resolved): ' + resolvedUrl);",
+                  "console.log('  [INFO] Nilai a = divideResult (' + a + ')');",
+                  "console.log('     → a = ' + a);",
+                  "console.log('     → b = 5');",
+                  "console.log('');",
+                  "console.log('  >> Request Headers:');",
+                  "pm.request.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var duration = pm.response.responseTime;",
+                  "var inputA = pm.environment.get('divideResult');",
+                  "",
+                  "console.log('');",
+                  "console.log('[3c] GET ADD (Path Variable) — RESPONSE');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Status   : ' + pm.response.status + ' (' + pm.response.code + ')');",
+                  "console.log('  Duration : ' + duration + ' ms');",
+                  "console.log('');",
+                  "console.log('  >> Response Headers:');",
+                  "pm.response.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Response Body:');",
+                  "console.log('     ' + pm.response.text());",
+                  "console.log('');",
+                  "",
+                  "pm.test('[3c][Add] Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('[3c][Add] success = true', function () { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('[3c][Add] payload adalah angka', function () { pm.expect(jsonData.payload).to.be.a('number'); });",
+                  "pm.test('[3c][Add] ' + inputA + ' + 5 = ' + (parseFloat(inputA) + 5), function () {",
+                  "    pm.expect(jsonData.payload).to.eql(parseFloat(inputA) + 5);",
+                  "});",
+                  "",
+                  "pm.environment.set('addResult', jsonData.payload);",
+                  "console.log('[CHAIN] addResult = ' + jsonData.payload + ' (dari Path Variable)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/add/{{divideResult}}/5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "calculator",
+                "add",
+                "{{divideResult}}",
+                "5"
+              ]
+            },
+            "description": "GET via Path Variable. a = divideResult (hasil POST Divide), b=5."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Pengurangan (Subtract)",
+      "description": "Folder Subtract — 3 cara input.\nNilai a = addResult (hasil POST Add), b=5.\nIni adalah folder terakhir — menampilkan ringkasan akhir di step 4a.",
+      "item": [
+        {
+          "name": "4a. POST /api/calculator/subtract (Body)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var a = pm.environment.get('addResult');",
+                  "var rawBody = pm.request.body.raw;",
+                  "var resolvedBody = pm.variables.replaceIn(rawBody);",
+                  "",
+                  "console.log('');",
+                  "console.log('══════════════════════════════════════════════════');",
+                  "console.log('📁 FOLDER: PENGURANGAN (SUBTRACT)');",
+                  "console.log('══════════════════════════════════════════════════');",
+                  "console.log('[4a] POST SUBTRACT — REQUEST');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Method : POST');",
+                  "console.log('  URL    : ' + pm.request.url.toString());",
+                  "console.log('  [INFO] Nilai a = addResult (' + a + ')');",
+                  "console.log('');",
+                  "console.log('  >> Request Headers:');",
+                  "pm.request.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Request Body (resolved):');",
+                  "console.log('     ' + resolvedBody);",
+                  "try {",
+                  "    var bodyObj = JSON.parse(resolvedBody);",
+                  "    console.log('     → a = ' + bodyObj.a);",
+                  "    console.log('     → b = ' + bodyObj.b);",
+                  "} catch(e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var duration = pm.response.responseTime;",
+                  "var inputA = pm.environment.get('addResult');",
+                  "pm.environment.set('subtractResultDuration', duration);",
+                  "",
+                  "console.log('');",
+                  "console.log('[4a] POST SUBTRACT — RESPONSE');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Status   : ' + pm.response.status + ' (' + pm.response.code + ')');",
+                  "console.log('  Duration : ' + duration + ' ms');",
+                  "console.log('');",
+                  "console.log('  >> Response Headers:');",
+                  "pm.response.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Response Body:');",
+                  "console.log('     ' + pm.response.text());",
+                  "console.log('');",
+                  "",
+                  "pm.test('[4a][Subtract] Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('[4a][Subtract] success = true', function () { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('[4a][Subtract] payload adalah angka', function () { pm.expect(jsonData.payload).to.be.a('number'); });",
+                  "pm.test('[4a][Subtract] ' + inputA + ' - 5 = ' + (parseFloat(inputA) - 5), function () {",
+                  "    pm.expect(jsonData.payload).to.eql(parseFloat(inputA) - 5);",
+                  "});",
+                  "",
+                  "pm.environment.set('subtractResult', jsonData.payload);",
+                  "console.log('[CHAIN] subtractResult = ' + jsonData.payload);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/subtract",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "calculator",
+                "subtract"
+              ]
+            },
+            "description": "POST via Request Body. a = addResult, b=5. FINAL step chain.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"a\": {{addResult}},\n  \"b\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4b. GET /api/calculator/subtract?a={{addResult}}&b=5 (Query Param)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var a = pm.environment.get('addResult');",
+                  "var resolvedUrl = pm.variables.replaceIn(pm.request.url.toString());",
+                  "",
+                  "console.log('');",
+                  "console.log('[4b] GET SUBTRACT (Query Param) — REQUEST');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Method : GET');",
+                  "console.log('  URL (resolved): ' + resolvedUrl);",
+                  "console.log('  [INFO] Nilai a = addResult (' + a + ')');",
+                  "console.log('     → a = ' + a);",
+                  "console.log('     → b = 5');",
+                  "console.log('');",
+                  "console.log('  >> Request Headers:');",
+                  "pm.request.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var duration = pm.response.responseTime;",
+                  "var inputA = pm.environment.get('addResult');",
+                  "",
+                  "console.log('');",
+                  "console.log('[4b] GET SUBTRACT (Query Param) — RESPONSE');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Status   : ' + pm.response.status + ' (' + pm.response.code + ')');",
+                  "console.log('  Duration : ' + duration + ' ms');",
+                  "console.log('');",
+                  "console.log('  >> Response Headers:');",
+                  "pm.response.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Response Body:');",
+                  "console.log('     ' + pm.response.text());",
+                  "console.log('');",
+                  "",
+                  "pm.test('[4b][Subtract] Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('[4b][Subtract] success = true', function () { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('[4b][Subtract] payload adalah angka', function () { pm.expect(jsonData.payload).to.be.a('number'); });",
+                  "pm.test('[4b][Subtract] ' + inputA + ' - 5 = ' + (parseFloat(inputA) - 5), function () {",
+                  "    pm.expect(jsonData.payload).to.eql(parseFloat(inputA) - 5);",
+                  "});",
+                  "",
+                  "pm.environment.set('subtractResult', jsonData.payload);",
+                  "console.log('[CHAIN] subtractResult = ' + jsonData.payload + ' (dari Query Param)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/subtract?a={{addResult}}&b=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "calculator",
+                "subtract"
+              ],
+              "query": [
+                {
+                  "key": "a",
+                  "value": "{{addResult}}"
+                },
+                {
+                  "key": "b",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "GET via Query Param. a = addResult (hasil POST Add), b=5."
+          },
+          "response": []
+        },
+        {
+          "name": "4c. GET /api/calculator/subtract/{{addResult}}/5 (Path Variable)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var a = pm.environment.get('addResult');",
+                  "var resolvedUrl = pm.variables.replaceIn(pm.request.url.toString());",
+                  "",
+                  "console.log('');",
+                  "console.log('[4c] GET SUBTRACT (Path Variable) — REQUEST');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Method : GET');",
+                  "console.log('  URL (resolved): ' + resolvedUrl);",
+                  "console.log('  [INFO] Nilai a = addResult (' + a + ')');",
+                  "console.log('     → a = ' + a);",
+                  "console.log('     → b = 5');",
+                  "console.log('');",
+                  "console.log('  >> Request Headers:');",
+                  "pm.request.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var duration = pm.response.responseTime;",
+                  "var inputA = pm.environment.get('addResult');",
+                  "",
+                  "console.log('');",
+                  "console.log('[4c] GET SUBTRACT (Path Variable) — RESPONSE');",
+                  "console.log('──────────────────────────────────────────────────');",
+                  "console.log('  Status   : ' + pm.response.status + ' (' + pm.response.code + ')');",
+                  "console.log('  Duration : ' + duration + ' ms');",
+                  "console.log('');",
+                  "console.log('  >> Response Headers:');",
+                  "pm.response.headers.each(function(h) { console.log('     ' + h.key + ': ' + h.value); });",
+                  "console.log('');",
+                  "console.log('  >> Response Body:');",
+                  "console.log('     ' + pm.response.text());",
+                  "console.log('');",
+                  "",
+                  "pm.test('[4c][Subtract] Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('[4c][Subtract] success = true', function () { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('[4c][Subtract] payload adalah angka', function () { pm.expect(jsonData.payload).to.be.a('number'); });",
+                  "pm.test('[4c][Subtract] ' + inputA + ' - 5 = ' + (parseFloat(inputA) - 5), function () {",
+                  "    pm.expect(jsonData.payload).to.eql(parseFloat(inputA) - 5);",
+                  "});",
+                  "",
+                  "pm.environment.set('subtractResult', jsonData.payload);",
+                  "console.log('[CHAIN] subtractResult = ' + jsonData.payload + ' (dari Path Variable)');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/subtract/{{addResult}}/5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "calculator",
+                "subtract",
+                "{{addResult}}",
+                "5"
+              ]
+            },
+            "description": "GET via Path Variable. a = addResult (hasil POST Add), b=5."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ]
+}

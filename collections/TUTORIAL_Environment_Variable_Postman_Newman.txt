@@ -1,0 +1,1564 @@
+
+================================================================================
+
+         T U T O R I A L   L E N G K A P
+   ENVIRONMENT VARIABLE & CHAINING di POSTMAN + NEWMAN
+            (Studi Kasus: Project Calculator API)
+
+================================================================================
+
+  Dokumen ini menjelaskan secara detail bagaimana memanggil beberapa endpoint
+  secara BERURUTAN, di mana hasil (response) dari satu endpoint dipakai sebagai
+  input endpoint berikutnya - baik lewat aplikasi Postman maupun Newman (CLI).
+
+  Setelah menyelesaikan tutorial ini Anda akan menguasai:
+    - Cara kerja environment variable dan chaining antar request
+    - Anatomi file collection JSON (apa isinya dan bagaimana strukturnya)
+    - Pre-request script & test script (sintaks lengkap pm.* API)
+    - Cara menjalankan collection lewat Newman dengan berbagai opsi
+    - Cara membuat laporan HTML, JSON, JUnit untuk dokumentasi & CI/CD
+    - Data-driven testing dengan file CSV/JSON
+    - Integrasi Newman ke pipeline Jenkins
+    - Debugging & troubleshooting error umum
+    - Best practices untuk membangun collection yang maintainable
+
+  Disusun berdasarkan studi kasus nyata pada project:
+  D:\AI\test1\jenkins\calculatorLengkap
+
+  File terkait:
+    collections\calculator_newman_chain_v3.json      (collection utama, 12 request)
+    collections\calculator_newman_chain_env_v2.json  (file environment)
+    newman-reports\report.html                        (output HTML report)
+    newman-reports\newman-result.json                 (output JSON report)
+
+================================================================================
+  DAFTAR ISI
+================================================================================
+
+  BAB 1  .... Apa itu Environment Variable?
+  BAB 2  .... Perintah pm.* (set / get / unset / response / test)
+  BAB 3  .... ATURAN MAIN: Syarat agar bisa di-hit berurutan
+  BAB 4  .... Pola Chaining (Linear & Fan-In)
+  BAB 5  .... Anatomi File Collection JSON (NEW)
+  BAB 6  .... Pre-request & Test Script Lanjutan (NEW)
+  BAB 7  .... Yang Dibutuhkan & Cara Instalasi
+  BAB 8  .... Cara Running di Newman (CLI)
+  BAB 9  .... Reporter & Membuat Laporan HTML Lengkap (NEW)
+  BAB 10 .... Data-Driven Testing dengan CSV/JSON (NEW)
+  BAB 11 .... Menjalankan Folder/Group Tertentu (NEW)
+  BAB 12 .... Export & Import Collection + Environment
+  BAB 13 .... Integrasi Newman dengan Jenkins CI/CD (NEW)
+  BAB 14 .... Debugging & Tips (NEW)
+  BAB 15 .... Troubleshooting (Error yang sering muncul)
+  BAB 16 .... Best Practices (NEW)
+  BAB 17 .... Cheat Sheet (Ringkasan Cepat)
+
+
+================================================================================
+  BAB 1  -  APA ITU ENVIRONMENT VARIABLE?
+================================================================================
+
+  Environment Variable adalah "wadah penyimpanan sementara" yang dipakai untuk
+  menyimpan nilai dan dapat dipanggil kembali di request lain.
+
+  Analogi sederhana:
+  ------------------
+  Bayangkan Anda mengisi formulir. Hasil perhitungan di halaman 1 Anda catat
+  di kertas tempel (sticky note). Di halaman 3, Anda tinggal lihat kertas
+  tempel itu tanpa menghitung ulang.
+
+      [Endpoint A]  -->  hasil disimpan ke variable  -->  [Endpoint B baca variable]
+
+  KENAPA PENTING UNTUK CHAINING?
+  ------------------------------
+  REST API itu stateless (tidak saling mengingat). Endpoint pembagian TIDAK
+  tahu hasil endpoint perkalian. Maka kita butuh "jembatan" untuk membawa
+  nilai dari satu request ke request berikutnya. Jembatan itu = environment
+  variable.
+
+  TINGKATAN VARIABLE DI POSTMAN (dari paling luas ke paling sempit):
+  ------------------------------------------------------------------
+    1. Global        -> berlaku di semua collection & environment
+    2. Collection    -> berlaku di satu collection
+    3. Environment   -> berlaku saat environment tertentu aktif   <-- DIPAKAI DI SINI
+    4. Data          -> dari file CSV/JSON saat Collection Runner
+    5. Local         -> hanya hidup selama 1 kali eksekusi script
+
+  PRIORITAS PEMBACAAN VARIABLE
+  ----------------------------
+  Jika ada variable dengan NAMA SAMA di beberapa scope, Postman akan membaca
+  dari scope yang PALING SEMPIT terlebih dahulu:
+
+      Local > Data > Environment > Collection > Global
+
+  Contoh: jika "baseUrl" ada di Environment dan juga di Global, yang dipakai
+  adalah yang di Environment.
+
+  Untuk chaining, ENVIRONMENT variable adalah pilihan paling pas: cukup luas
+  untuk dibagi antar-request, tapi tetap terpisah per-environment (misal: bisa
+  punya environment "Local", "Staging", "Production" yang berbeda).
+
+
+================================================================================
+  BAB 2  -  PERINTAH pm.* (SET / GET / UNSET / RESPONSE / TEST)
+================================================================================
+
+  Semua manipulasi variable dilakukan lewat JavaScript di dalam tab:
+    - "Scripts > Pre-request"  (dijalankan SEBELUM request dikirim)
+    - "Scripts > Post-response" / "Tests"  (dijalankan SETELAH response diterima)
+
+  ----------------------------------------------------------------------------
+  2.1  MENYIMPAN NILAI  ->  pm.environment.set(nama, nilai)
+  ----------------------------------------------------------------------------
+
+      // Ambil body response sebagai JSON
+      var jsonData = pm.response.json();
+
+      // Simpan field "payload" ke variable bernama "multiplyResult"
+      pm.environment.set("multiplyResult", jsonData.payload);
+
+  ----------------------------------------------------------------------------
+  2.2  MEMBACA NILAI  ->  pm.environment.get(nama)
+  ----------------------------------------------------------------------------
+
+      var nilai = pm.environment.get("multiplyResult");
+      console.log("Nilai tersimpan = " + nilai);
+
+  ----------------------------------------------------------------------------
+  2.3  MENGHAPUS NILAI  ->  pm.environment.unset(nama)
+  ----------------------------------------------------------------------------
+
+      pm.environment.unset("multiplyResult");
+
+      // Penting untuk RESET sebelum run baru, supaya tidak terjebak nilai lama.
+
+  ----------------------------------------------------------------------------
+  2.4  MEMAKAI VARIABLE DI BODY / URL  ->  {{nama}}
+  ----------------------------------------------------------------------------
+
+  Di dalam body request (mode raw JSON), gunakan kurung kurawal ganda:
+
+      {
+        "a": {{multiplyResult}},
+        "b": 2
+      }
+
+  Saat request dikirim, Postman/Newman otomatis mengganti {{multiplyResult}}
+  dengan nilai aslinya (misal jadi 50).
+
+  Variable juga bisa dipakai di:
+      URL              : {{baseUrl}}/api/calculator/multiply
+      Path variable    : {{baseUrl}}/api/calculator/multiply/{{a}}/{{b}}
+      Query parameter  : {{baseUrl}}/api/calculator/multiply?a={{a}}&b={{b}}
+      Headers          : Authorization: Bearer {{token}}
+      Body raw JSON    : { "a": {{multiplyResult}}, "b": 5 }
+
+  ----------------------------------------------------------------------------
+  2.5  PERINTAH pm.* LAIN YANG SERING DIPAKAI
+  ----------------------------------------------------------------------------
+
+  RESPONSE:
+      pm.response.code                  -> status code (200, 404, dll)
+      pm.response.status                -> "OK", "Not Found", dll
+      pm.response.responseTime          -> waktu respon dalam ms
+      pm.response.responseSize          -> ukuran respon dalam byte
+      pm.response.json()                -> parse body sebagai JSON
+      pm.response.text()                -> body sebagai teks mentah
+      pm.response.headers.get("nama")   -> ambil nilai header
+
+  REQUEST (di pre-request script):
+      pm.request.url.toString()
+      pm.request.method                 -> "GET", "POST", dll
+      pm.request.headers.add({key:"X-Foo", value:"bar"})
+      pm.request.body                   -> body yang akan dikirim
+
+  VARIABLE (general - bisa baca dari scope manapun):
+      pm.variables.get("nama")          -> baca variable di scope terdekat
+      pm.variables.set("nama", val)     -> simpan ke local scope (hilang setelah run)
+
+  GLOBAL (lebih luas dari environment):
+      pm.globals.set("nama", val)
+      pm.globals.get("nama")
+      pm.globals.unset("nama")
+      pm.globals.clear()                -> hapus SEMUA global variable
+
+  COLLECTION VARIABLE:
+      pm.collectionVariables.set("nama", val)
+      pm.collectionVariables.get("nama")
+
+  ITERATION DATA (saat data-driven testing):
+      pm.iterationData.get("namaKolom")
+
+  EXECUTION CONTROL:
+      pm.execution.setNextRequest("Nama Request")  -> lompat ke request lain
+      pm.execution.setNextRequest(null)            -> stop run
+
+  ----------------------------------------------------------------------------
+  2.6  ATURAN PENTING TENTANG {{variable}}
+  ----------------------------------------------------------------------------
+
+  Jika variable BELUM diisi, {{multiplyResult}} akan dikirim APA ADANYA
+  (literal teks). Server akan menerima:
+
+      { "a": {{multiplyResult}}, "b": 5 }
+
+  dan kurung "{" akan dianggap awal JSON object -> ERROR PARSE.
+
+  Inilah penyebab error:
+      "Cannot deserialize value of type double from Object value
+       (token JsonToken.START_OBJECT)"
+
+  ==> Makanya request ke-2 TIDAK BOLEH dijalankan sendiri sebelum request ke-1.
+
+
+================================================================================
+  BAB 3  -  ATURAN MAIN: SYARAT AGAR BISA DI-HIT BERURUTAN
+================================================================================
+
+  Berikut "hukum" yang WAJIB dipatuhi agar chaining berhasil. Aturan ini lahir
+  dari error-error nyata yang ditemui saat membangun collection calculator.
+
+  ----------------------------------------------------------------------------
+  ATURAN #1 : URUTAN REQUEST = URUTAN DI DALAM COLLECTION
+  ----------------------------------------------------------------------------
+  Postman & Newman menjalankan request dari ATAS ke BAWAH sesuai urutannya di
+  dalam folder collection. Susun request sesuai alur yang diinginkan:
+
+      1. Perkalian (Multiply)    -> hasil disimpan ke multiplyResult
+      2. Pembagian (Divide)      -> pakai multiplyResult, simpan ke divideResult
+      3. Penjumlahan (Add)       -> pakai divideResult, simpan ke addResult
+      4. Pengurangan (Subtract)  -> pakai addResult, simpan ke subtractResult
+
+  Untuk mengubah urutan: cukup drag-and-drop request di sidebar Postman.
+
+  ----------------------------------------------------------------------------
+  ATURAN #2 : REQUEST DEPENDEN HARUS DIJALANKAN LEWAT "COLLECTION RUNNER"
+  ----------------------------------------------------------------------------
+  Request ke-2, 3, 4 BERGANTUNG pada response sebelumnya. Mereka TIDAK BISA
+  ditekan tombol "Send" sendirian.
+
+      CARA SALAH  : tekan Send di request "Pembagian" langsung
+                    -> variable kosong -> ERROR
+      CARA BENAR  : klik kanan collection -> Run collection -> Run
+                    -> semua request jalan berurutan, variable mengalir
+
+  ----------------------------------------------------------------------------
+  ATURAN #3 : SETIAP HASIL DISIMPAN DI TEST / POST-RESPONSE SCRIPT
+  ----------------------------------------------------------------------------
+  Nilai response hanya tersedia SETELAH response diterima. Maka penyimpanan
+  variable WAJIB di tab Post-response (Tests), bukan Pre-request.
+
+      // Tab Tests / Post-response milik request "Perkalian"
+      var jsonData = pm.response.json();
+      pm.environment.set("multiplyResult", jsonData.payload);
+
+  ----------------------------------------------------------------------------
+  ATURAN #4 : RESET VARIABLE DI AWAL, HANYA DI REQUEST PERTAMA
+  ----------------------------------------------------------------------------
+  Environment variable bersifat PERSISTEN (nilainya tetap tersimpan walau run
+  selesai). Jika tidak di-reset, run berikutnya bisa "terjebak" nilai lama.
+
+  Contoh masalah nyata:
+      Run-1: perkalian 10 x 5 = 50  -> tersimpan 50
+      Run-2: perkalian  3 x 7 = 21  -> TAPI variable masih 50 jika logic salah
+
+  SOLUSI: letakkan script reset di tab Pre-request milik REQUEST PERTAMA saja:
+
+      // Pre-request milik request "Perkalian" (request #1)
+      pm.environment.unset("multiplyResult");
+      pm.environment.unset("divideResult");
+      pm.environment.unset("addResult");
+      pm.environment.unset("subtractResult");
+
+  JANGAN letakkan reset di "Collection-level Pre-request script", karena script
+  itu jalan SEBELUM SETIAP request (bukan sekali di awal), sehingga variable
+  akan ter-reset terus-menerus di tengah jalan -> chain putus.
+
+  ----------------------------------------------------------------------------
+  ATURAN #5 : NAMA FIELD JSON HARUS SESUAI RESPONSE ASLI
+  ----------------------------------------------------------------------------
+  Perhatikan nama field response. Pada calculator API, walau di Java getter-nya
+  bernama isSuccess(), JSON yang keluar memakai key "success" (bukan
+  "isSuccess"). Maka di test script gunakan:
+
+      pm.expect(jsonData.success).to.be.true;     // BENAR
+      pm.expect(jsonData.isSuccess).to.be.true;   // SALAH -> undefined
+
+  Selalu cek dulu bentuk response asli sebelum menulis assertion.
+
+  ----------------------------------------------------------------------------
+  ATURAN #6 : UNTUK FAN-IN, PAKAI NAMA VARIABLE BERBEDA
+  ----------------------------------------------------------------------------
+  Jika dua endpoint independen hasilnya dipakai bersama, simpan ke variable
+  yang BERBEDA agar tidak saling menimpa:
+
+      // Multiply A
+      pm.environment.set("multiplyA_result", jsonData.payload);
+      // Multiply B
+      pm.environment.set("multiplyB_result", jsonData.payload);
+      // Add (fan-in)
+      // body: { "a": {{multiplyA_result}}, "b": {{multiplyB_result}} }
+
+
+================================================================================
+  BAB 4  -  POLA CHAINING
+================================================================================
+
+  ----------------------------------------------------------------------------
+  4.1  POLA LINEAR CHAIN (berantai lurus)
+  ----------------------------------------------------------------------------
+
+  Output tiap langkah jadi input langkah berikutnya.
+
+      [Multiply]      10 x 5 = 50
+          |
+          v   (multiplyResult = 50)
+      [Divide]        50 / 5 = 10
+          |
+          v   (divideResult = 10)
+      [Add]           10 + 5 = 15
+          |
+          v   (addResult = 15)
+      [Subtract]      15 - 5 = 10   <-- hasil akhir
+
+  File contoh : calculator_newman_chain_v3.json
+  Environment : calculator_newman_chain_env_v2.json
+
+  ----------------------------------------------------------------------------
+  4.2  POLA FAN-IN (banyak masukan -> satu keluaran)
+  ----------------------------------------------------------------------------
+
+  Dua endpoint independen, hasilnya digabung di endpoint ketiga.
+
+      [Multiply A]  6 x 3 = 18 --+
+                                 |
+                                 +--> [Add]  18 + 20 = 38   <-- hasil akhir
+                                 |
+      [Multiply B]  4 x 5 = 20 --+
+
+  Catatan: Multiply A dan Multiply B TIDAK saling bergantung, tetapi Postman
+  tetap menjalankannya berurutan (A dulu, baru B). Postman TIDAK mendukung
+  eksekusi paralel sungguhan (concurrent). Add baru jalan setelah A & B selesai.
+
+  ----------------------------------------------------------------------------
+  4.3  CATATAN: POSTMAN/NEWMAN TIDAK BISA PARALEL MURNI
+  ----------------------------------------------------------------------------
+  Semua request dijalankan satu-per-satu (sekuensial). Jika butuh benar-benar
+  paralel (concurrent / bersamaan dalam waktu yang sama), gunakan tool lain:
+      - JMeter  (Thread Group)
+      - k6      (async/await)
+      - Script Node.js dengan Promise.all([...])
+
+
+================================================================================
+  BAB 5  -  ANATOMI FILE COLLECTION JSON  (NEW)
+================================================================================
+
+  File yang di-export dari Postman adalah JSON dengan format "Collection v2.1".
+  Memahami strukturnya bermanfaat untuk:
+    - debugging saat error parsing
+    - modifikasi cepat tanpa harus buka Postman
+    - menulis collection dari nol secara manual
+    - integrasi dengan tools lain (generator, validator)
+
+  ----------------------------------------------------------------------------
+  5.1  STRUKTUR UMUM COLLECTION
+  ----------------------------------------------------------------------------
+
+      {
+        "info": {
+          "name": "Calculator - Newman Chain v3",
+          "_postman_id": "...",
+          "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+        },
+        "item": [
+          {
+            "name": "Perkalian (Multiply)",
+            "item": [
+              { "name": "1a. POST Multiply (Body)", "request": {...}, "event": [...] },
+              { "name": "1b. GET Multiply (Query)", "request": {...}, "event": [...] }
+            ]
+          },
+          { "name": "Pembagian (Divide)", "item": [...] }
+        ],
+        "event": [
+          { "listen": "prerequest", "script": {...} },
+          { "listen": "test",       "script": {...} }
+        ],
+        "variable": [
+          { "key": "baseUrl", "value": "http://localhost:8080" }
+        ]
+      }
+
+  Penjelasan field:
+
+      info       -> metadata collection (nama, ID, versi schema)
+      item       -> daftar request atau FOLDER (folder = item yang punya "item" lagi)
+      event      -> script tingkat collection (prerequest & test global)
+      variable   -> collection variables (skup lebih sempit dari environment)
+
+  ----------------------------------------------------------------------------
+  5.2  STRUKTUR SATU REQUEST
+  ----------------------------------------------------------------------------
+
+      {
+        "name": "1a. POST /api/calculator/multiply (Body)",
+        "event": [
+          {
+            "listen": "prerequest",
+            "script": { "type": "text/javascript", "exec": ["// kode JS di sini"] }
+          },
+          {
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": ["// assertion di sini"] }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [
+            { "key": "Content-Type", "value": "application/json" }
+          ],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"a\": 10,\n  \"b\": 5\n}",
+            "options": { "raw": { "language": "json" } }
+          },
+          "url": {
+            "raw": "{{baseUrl}}/api/calculator/multiply",
+            "host": ["{{baseUrl}}"],
+            "path": ["api", "calculator", "multiply"]
+          }
+        }
+      }
+
+  ----------------------------------------------------------------------------
+  5.3  STRUKTUR FILE ENVIRONMENT
+  ----------------------------------------------------------------------------
+
+      {
+        "id": "...",
+        "name": "Calculator Local Environment",
+        "values": [
+          {
+            "key": "baseUrl",
+            "value": "http://localhost:8080",
+            "type": "default",
+            "enabled": true
+          },
+          {
+            "key": "multiplyResult",
+            "value": "",
+            "type": "default",
+            "enabled": true
+          }
+        ],
+        "_postman_variable_scope": "environment"
+      }
+
+  PENTING: field "value" di file environment = INITIAL VALUE. Nilai dari
+  pm.environment.set() disimpan ke CURRENT VALUE yang TIDAK ikut ter-export.
+
+  ----------------------------------------------------------------------------
+  5.4  CARA URL DIPISAH JADI BAGIAN-BAGIAN
+  ----------------------------------------------------------------------------
+
+  Postman memecah URL jadi tiga bagian agar mudah dimanipulasi:
+
+      "url": {
+        "raw":   "{{baseUrl}}/api/calculator/multiply?a={{a}}&b=5",
+        "host":  ["{{baseUrl}}"],
+        "path":  ["api", "calculator", "multiply"],
+        "query": [
+          { "key": "a", "value": "{{a}}" },
+          { "key": "b", "value": "5" }
+        ]
+      }
+
+  Untuk path variable (misal /multiply/10/5), bagian path-nya:
+
+      "path": ["api", "calculator", "multiply", "{{a}}", "{{b}}"]
+
+  ----------------------------------------------------------------------------
+  5.5  SCRIPT DALAM JSON DITULIS DALAM ARRAY OF STRINGS
+  ----------------------------------------------------------------------------
+
+  Karena JSON tidak bisa multiline string secara native, script JavaScript
+  ditulis sebagai ARRAY (tiap baris = satu elemen):
+
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "var json = pm.response.json();",
+          "pm.environment.set(\"multiplyResult\", json.payload);",
+          "pm.test(\"Status 200\", function() {",
+          "  pm.response.to.have.status(200);",
+          "});"
+        ]
+      }
+
+  Jika harus edit manual: hati-hati escape karakter \" untuk tanda kutip,
+  dan \n untuk newline di dalam string (misal body raw JSON).
+
+
+================================================================================
+  BAB 6  -  PRE-REQUEST & TEST SCRIPT LANJUTAN  (NEW)
+================================================================================
+
+  ----------------------------------------------------------------------------
+  6.1  ALUR EKSEKUSI SCRIPT (PENTING DIPAHAMI)
+  ----------------------------------------------------------------------------
+
+  Untuk SETIAP request, urutan eksekusi script-nya adalah:
+
+      1. Collection-level Pre-request script         (kalau ada)
+      2. Folder-level Pre-request script             (kalau ada)
+      3. Request-level Pre-request script            (yang spesifik request itu)
+      4. [REQUEST DIKIRIM, RESPONSE DITERIMA]
+      5. Collection-level Test script                (kalau ada)
+      6. Folder-level Test script                    (kalau ada)
+      7. Request-level Test script                   (yang spesifik request itu)
+
+  Implikasi: script di tingkat collection akan jalan BERKALI-KALI (sebanyak
+  jumlah request). Sangat penting menentukan di tingkat mana script ditulis.
+
+  ----------------------------------------------------------------------------
+  6.2  CONTOH PRE-REQUEST SCRIPT UMUM
+  ----------------------------------------------------------------------------
+
+  RESET variable (di request pertama saja):
+
+      pm.environment.unset("multiplyResult");
+      pm.environment.unset("divideResult");
+      pm.environment.unset("addResult");
+
+  GENERATE timestamp dinamis:
+
+      var ts = new Date().toISOString();
+      pm.environment.set("timestamp", ts);
+
+  GENERATE random number:
+
+      var rnd = Math.floor(Math.random() * 1000);
+      pm.environment.set("randomNum", rnd);
+
+  GENERATE UUID:
+
+      pm.environment.set("requestId", pm.variables.replaceIn("{{$guid}}"));
+
+  HITUNG signature / HMAC (contoh):
+
+      var crypto = require("crypto-js");
+      var secret = pm.environment.get("apiSecret");
+      var sig = crypto.HmacSHA256(pm.environment.get("timestamp"), secret).toString();
+      pm.environment.set("signature", sig);
+
+  TAMBAH header dinamis:
+
+      pm.request.headers.add({
+        key: "X-Request-Id",
+        value: pm.variables.replaceIn("{{$guid}}")
+      });
+
+  ----------------------------------------------------------------------------
+  6.3  CONTOH TEST SCRIPT UMUM
+  ----------------------------------------------------------------------------
+
+  ASSERT status code:
+
+      pm.test("Status 200", function () {
+        pm.response.to.have.status(200);
+      });
+
+  ASSERT status code dari list pilihan:
+
+      pm.test("Status is success", function () {
+        pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);
+      });
+
+  ASSERT response time:
+
+      pm.test("Response time < 500ms", function () {
+        pm.expect(pm.response.responseTime).to.be.below(500);
+      });
+
+  ASSERT header tertentu ada:
+
+      pm.test("Punya header Content-Type", function () {
+        pm.response.to.have.header("Content-Type");
+      });
+
+  ASSERT body adalah JSON valid:
+
+      pm.test("Body adalah JSON valid", function () {
+        pm.response.to.be.json;
+      });
+
+  ASSERT field tertentu ada di JSON:
+
+      pm.test("Punya field payload", function () {
+        var json = pm.response.json();
+        pm.expect(json).to.have.property("payload");
+      });
+
+  ASSERT nilai field:
+
+      pm.test("Field success = true", function () {
+        var json = pm.response.json();
+        pm.expect(json.success).to.eql(true);
+      });
+
+  ASSERT tipe data:
+
+      pm.test("Payload adalah angka", function () {
+        var json = pm.response.json();
+        pm.expect(json.payload).to.be.a("number");
+      });
+
+  ASSERT nilai numerik:
+
+      pm.test("10 x 5 = 50", function () {
+        var json = pm.response.json();
+        pm.expect(json.payload).to.eql(50);
+      });
+
+  EKSTRAK & SIMPAN nilai response:
+
+      var json = pm.response.json();
+      pm.environment.set("multiplyResult", json.payload);
+      console.log("[CHAIN] multiplyResult = " + json.payload);
+
+  EKSTRAK nilai NESTED:
+
+      var json = pm.response.json();
+      pm.environment.set("token", json.data.user.accessToken);
+
+  ----------------------------------------------------------------------------
+  6.4  KENDALI ALUR EKSEKUSI (CONDITIONAL FLOW)
+  ----------------------------------------------------------------------------
+
+  STOP run jika test gagal:
+
+      if (pm.response.code !== 200) {
+        pm.execution.setNextRequest(null);  // berhenti
+      }
+
+  LOMPAT ke request tertentu:
+
+      pm.execution.setNextRequest("Cleanup");  // skip ke request bernama "Cleanup"
+
+  LOOP request yang sama:
+
+      var count = pm.environment.get("count") || 0;
+      if (count < 3) {
+        pm.environment.set("count", count + 1);
+        pm.execution.setNextRequest(pm.info.requestName);  // ulangi request ini
+      }
+
+  ----------------------------------------------------------------------------
+  6.5  CHAI.JS ASSERTION SYNTAX (LIBRARY YANG DIPAKAI POSTMAN)
+  ----------------------------------------------------------------------------
+
+  Postman pakai Chai.js untuk assertion. Sintaks utama:
+
+      pm.expect(actual).to.eql(expected)        // equal (deep)
+      pm.expect(actual).to.equal(expected)      // equal (strict ===)
+      pm.expect(actual).to.be.a("string")       // tipe data
+      pm.expect(actual).to.be.true              // boolean true
+      pm.expect(actual).to.be.null              // null
+      pm.expect(actual).to.be.undefined         // undefined
+      pm.expect(actual).to.exist                // bukan null/undefined
+      pm.expect(actual).to.be.above(5)          // > 5
+      pm.expect(actual).to.be.below(10)         // < 10
+      pm.expect(actual).to.be.at.least(5)       // >= 5
+      pm.expect(actual).to.be.at.most(10)       // <= 10
+      pm.expect(actual).to.have.length(3)       // panjang array/string
+      pm.expect(actual).to.include("foo")       // mengandung
+      pm.expect(actual).to.have.property("x")   // punya property
+      pm.expect(actual).to.match(/regex/)       // cocok regex
+      pm.expect(actual).to.be.oneOf([1,2,3])    // salah satu dari list
+
+
+================================================================================
+  BAB 7  -  YANG DIBUTUHKAN & CARA INSTALASI
+================================================================================
+
+  Newman adalah versi command-line dari Postman Collection Runner. Cocok untuk
+  otomasi / CI-CD (misalnya dipanggil dari Jenkins).
+
+  ----------------------------------------------------------------------------
+  7.1  PRASYARAT
+  ----------------------------------------------------------------------------
+    1. Node.js  (versi 18 ke atas direkomendasikan)
+    2. npm      (otomatis ikut saat install Node.js)
+    3. newman   (di-install lewat npm)
+
+  ----------------------------------------------------------------------------
+  7.2  LANGKAH INSTALASI
+  ----------------------------------------------------------------------------
+
+  LANGKAH 1 - Install Node.js
+    - Unduh dari: https://nodejs.org  (pilih versi LTS)
+    - Install seperti biasa (next-next-finish)
+
+  LANGKAH 2 - Cek Node.js & npm sudah terpasang
+    Buka Command Prompt / PowerShell, ketik:
+
+        node --version
+        npm --version
+
+    Jika muncul nomor versi, berarti sukses.
+
+  LANGKAH 3 - Install Newman secara global
+        npm install -g newman
+
+  LANGKAH 4 - Install reporter HTML yang lebih cantik (sangat direkomendasikan)
+        npm install -g newman-reporter-htmlextra
+
+  LANGKAH 5 - Install reporter JUnit (opsional, untuk Jenkins)
+        npm install -g newman-reporter-junit
+
+  LANGKAH 6 - Verifikasi Newman
+        newman --version
+
+  ----------------------------------------------------------------------------
+  7.3  STATUS DI MESIN ANDA SAAT TUTORIAL INI DIBUAT
+  ----------------------------------------------------------------------------
+    Node.js                    : v22.17.1   (OK)
+    npm                        : 11.11.1    (OK)
+    newman                     : 6.2.2      (OK - sudah terpasang, siap dipakai)
+    newman-reporter-htmlextra  : terpasang  (OK - report HTML siap dipakai)
+
+
+================================================================================
+  BAB 8  -  CARA RUNNING DI NEWMAN (CLI)
+================================================================================
+
+  ----------------------------------------------------------------------------
+  8.1  PERINTAH DASAR
+  ----------------------------------------------------------------------------
+
+        newman run <file-collection.json>
+
+  ----------------------------------------------------------------------------
+  8.2  PERINTAH DENGAN ENVIRONMENT (WAJIB UNTUK CHAINING)
+  ----------------------------------------------------------------------------
+
+  Format Windows (pakai backslash):
+
+        newman run collections\calculator_newman_chain_v3.json ^
+          -e collections\calculator_newman_chain_env_v2.json
+
+  Tanda ^ di akhir baris = lanjutan baris (line continuation di CMD).
+  Untuk PowerShell pakai tanda ` (backtick). Untuk Linux/Mac pakai \.
+
+  Tanpa -e (--environment), variable {{...}} tidak akan terisi -> chain gagal.
+
+  ----------------------------------------------------------------------------
+  8.3  CONTOH LENGKAP UNTUK PROJECT CALCULATOR INI
+  ----------------------------------------------------------------------------
+
+  Jalankan dari folder project (D:\AI\test1\jenkins\calculatorLengkap):
+
+      newman run collections\calculator_newman_chain_v3.json ^
+        -e collections\calculator_newman_chain_env_v2.json
+
+  Dengan output detail:
+
+      newman run collections\calculator_newman_chain_v3.json ^
+        -e collections\calculator_newman_chain_env_v2.json ^
+        --verbose
+
+  ----------------------------------------------------------------------------
+  8.4  OPSI (FLAG) YANG SERING DIPAKAI
+  ----------------------------------------------------------------------------
+
+    -e, --environment <file>    Memuat file environment (WAJIB untuk chaining)
+    -g, --globals <file>        Memuat file globals
+    -r, --reporters <list>      Pilih jenis reporter (cli, json, html, junit)
+    --verbose                   Tampilkan detail lengkap (request, response, log)
+    --silent                    Sembunyikan output CLI (cocok kombinasi -r json)
+    --reporter-cli-no-banner    Sembunyikan banner Newman
+    -n <num>                    Jalankan collection N kali (iterasi)
+    -d <file>                   Pakai data eksternal CSV/JSON (data-driven)
+    --folder <nama>             Jalankan satu folder saja (bisa berulang)
+    --delay-request <ms>        Jeda antar request (millisecond)
+    --timeout-request <ms>      Batas waktu tiap request
+    --timeout-script <ms>       Batas waktu eksekusi script
+    --bail                      Berhenti seketika saat ada test gagal
+    -k, --insecure              Skip validasi SSL (untuk HTTPS self-signed)
+    -x, --suppress-exit-code    Override exit code (selalu 0)
+    --env-var "key=value"       Override variable env via CLI (bisa berulang)
+    --global-var "key=value"    Override global variable via CLI
+    --export-environment <file> Export env setelah run (untuk debug)
+    --working-dir <path>        Set working directory
+
+  ----------------------------------------------------------------------------
+  8.5  MEMBUAT FILE .BAT AGAR TINGGAL DOUBLE-CLICK
+  ----------------------------------------------------------------------------
+
+  Isi file run-newman-chain.bat:
+
+      @echo off
+      echo ================================================
+      echo  Running Calculator Newman Chaining Collection
+      echo ================================================
+      cd /d "%~dp0"
+      newman run collections\calculator_newman_chain_v3.json ^
+        -e collections\calculator_newman_chain_env_v2.json ^
+        -r cli,htmlextra ^
+        --reporter-htmlextra-export newman-reports\report.html
+      pause
+
+  Simpan, lalu cukup double-click file .bat tersebut. File HTML report otomatis
+  ter-generate di newman-reports\report.html.
+
+  ----------------------------------------------------------------------------
+  8.6  MEMBACA HASIL RUN NEWMAN
+  ----------------------------------------------------------------------------
+
+  Di akhir run muncul tabel ringkasan. Yang paling penting kolom:
+
+      assertions  |  executed  |  failed
+      ------------+------------+--------
+                  |     48     |    0       <-- failed = 0 artinya SEMUA LULUS
+
+  Tanda di tiap test:
+      v (centang) = test lulus
+      angka + nama = test gagal (akan dirinci di bagian failure detail)
+
+  Exit code Newman:
+      0 = semua test lulus
+      1 = ada test gagal / koleksi error
+      Exit code ini bisa dibaca CI/CD (Jenkins, GitHub Actions) untuk
+      menentukan build pass atau fail.
+
+
+================================================================================
+  BAB 9  -  REPORTER & MEMBUAT LAPORAN HTML LENGKAP  (NEW)
+================================================================================
+
+  Reporter = "format keluaran" hasil run Newman. Newman bawaan punya 4 reporter
+  built-in, dan ada banyak reporter komunitas yang bisa di-install.
+
+  ----------------------------------------------------------------------------
+  9.1  REPORTER BUILT-IN (TIDAK PERLU INSTALL)
+  ----------------------------------------------------------------------------
+
+    cli       Default. Tampilan rapi di terminal.
+    json      Output JSON lengkap (untuk integrasi tools lain)
+    junit     XML format JUnit (untuk Jenkins / CI native)
+    progress  Progress bar minimal
+    emojitrain  Versi cli dengan emoji (gimmick)
+
+  ----------------------------------------------------------------------------
+  9.2  REPORTER KOMUNITAS YANG SERING DIPAKAI
+  ----------------------------------------------------------------------------
+
+    newman-reporter-htmlextra   HTML dashboard cantik, paling populer
+    newman-reporter-html        HTML versi simple (bawaan lama)
+    newman-reporter-allure      Format Allure (untuk integrasi Allure)
+    newman-reporter-teamcity    Format TeamCity CI
+    newman-reporter-slack       Kirim notifikasi ke Slack
+
+  Cara install (contoh):
+        npm install -g newman-reporter-htmlextra
+
+  ----------------------------------------------------------------------------
+  9.3  CARA MEMBUAT HTML REPORT - 4 LANGKAH
+  ----------------------------------------------------------------------------
+
+  LANGKAH 1 - Install reporter htmlextra (sekali saja, tidak diulang):
+
+        npm install -g newman-reporter-htmlextra
+
+  LANGKAH 2 - Jalankan Newman dengan flag HTML:
+
+        newman run collections\calculator_newman_chain_v3.json ^
+          -e collections\calculator_newman_chain_env_v2.json ^
+          -r cli,htmlextra ^
+          --reporter-htmlextra-export newman-reports\report.html
+
+      Penjelasan flag:
+        -r cli,htmlextra              -> aktifkan 2 reporter: terminal + HTML
+        --reporter-htmlextra-export   -> path file output HTML
+
+  LANGKAH 3 - File HTML tersimpan otomatis di:
+
+        D:\AI\test1\jenkins\calculatorLengkap\newman-reports\report.html
+
+  LANGKAH 4 - Buka file di browser:
+
+        start newman-reports\report.html
+
+      Atau klik dua kali file-nya di Windows Explorer.
+
+  ----------------------------------------------------------------------------
+  9.4  ISI LAPORAN HTML
+  ----------------------------------------------------------------------------
+
+  Setelah dibuka di browser, laporan HTML berisi:
+    - Dashboard ringkasan (total request, lulus, gagal, durasi total)
+    - Grafik tab per folder/group
+    - Detail tiap request (method, URL, headers, body)
+    - Detail tiap response (status, headers, body, response time)
+    - Hasil tiap assertion (centang hijau / silang merah)
+    - Console log (output console.log() dari script)
+    - Info iteration (kalau pakai -n atau -d)
+    - Filter untuk fokus ke request yang gagal saja
+
+  ----------------------------------------------------------------------------
+  9.5  OPSI TAMBAHAN UNTUK HTMLEXTRA
+  ----------------------------------------------------------------------------
+
+    --reporter-htmlextra-export <file>            Output path
+    --reporter-htmlextra-template <file>          Pakai template HBS custom
+    --reporter-htmlextra-logs                     Tampilkan console.log
+    --reporter-htmlextra-showOnlyFails            Hanya tampilkan yang gagal
+    --reporter-htmlextra-noSyntaxHighlighting     Matikan syntax highlight
+    --reporter-htmlextra-title "Calc API Test"    Judul kustom
+    --reporter-htmlextra-titleSize 4              Ukuran judul (1-6)
+    --reporter-htmlextra-darkTheme                Mode gelap
+    --reporter-htmlextra-omitHeaders              Sembunyikan headers
+    --reporter-htmlextra-omitRequestBodies        Sembunyikan request body
+    --reporter-htmlextra-omitResponseBodies       Sembunyikan response body
+    --reporter-htmlextra-skipSensitiveData        Skip data sensitif
+
+  Contoh lengkap dengan opsi:
+
+        newman run collections\calculator_newman_chain_v3.json ^
+          -e collections\calculator_newman_chain_env_v2.json ^
+          -r cli,htmlextra ^
+          --reporter-htmlextra-export newman-reports\report.html ^
+          --reporter-htmlextra-title "Calculator API Test" ^
+          --reporter-htmlextra-darkTheme ^
+          --reporter-htmlextra-logs
+
+  ----------------------------------------------------------------------------
+  9.6  MEMBUAT MULTIPLE REPORT SEKALIGUS
+  ----------------------------------------------------------------------------
+
+  Bisa generate HTML + JSON + JUnit sekaligus dalam satu run:
+
+        newman run collections\calculator_newman_chain_v3.json ^
+          -e collections\calculator_newman_chain_env_v2.json ^
+          -r cli,htmlextra,json,junit ^
+          --reporter-htmlextra-export newman-reports\report.html ^
+          --reporter-json-export newman-reports\result.json ^
+          --reporter-junit-export newman-reports\junit.xml
+
+  Berguna untuk:
+    - HTML  -> dibaca manusia (QA, developer)
+    - JSON  -> diolah script lain (custom dashboard)
+    - JUnit -> dibaca Jenkins / GitHub Actions secara native
+
+
+================================================================================
+  BAB 10  -  DATA-DRIVEN TESTING DENGAN CSV/JSON  (NEW)
+================================================================================
+
+  Data-driven testing = menjalankan collection yang SAMA dengan DATA INPUT YANG
+  BERBEDA-BEDA. Misal: tes endpoint perkalian dengan 100 kombinasi angka.
+
+  ----------------------------------------------------------------------------
+  10.1  CONTOH FILE CSV
+  ----------------------------------------------------------------------------
+
+  Buat file collections\data-multiply.csv:
+
+      a,b,expected
+      10,5,50
+      3,7,21
+      100,0,0
+      -5,4,-20
+
+  Setiap baris (kecuali header) = 1 iteration.
+
+  ----------------------------------------------------------------------------
+  10.2  CONTOH FILE JSON
+  ----------------------------------------------------------------------------
+
+  Buat file collections\data-multiply.json:
+
+      [
+        { "a": 10, "b": 5,  "expected": 50  },
+        { "a": 3,  "b": 7,  "expected": 21  },
+        { "a": 100,"b": 0,  "expected": 0   },
+        { "a": -5, "b": 4,  "expected": -20 }
+      ]
+
+  ----------------------------------------------------------------------------
+  10.3  CARA PAKAI DI COLLECTION
+  ----------------------------------------------------------------------------
+
+  Di request body:
+
+      {
+        "a": {{a}},
+        "b": {{b}}
+      }
+
+  Di test script:
+
+      pm.test("Hasil sesuai expected", function () {
+        var json = pm.response.json();
+        pm.expect(json.payload).to.eql(Number(pm.iterationData.get("expected")));
+      });
+
+  ----------------------------------------------------------------------------
+  10.4  CARA RUN
+  ----------------------------------------------------------------------------
+
+  Jalankan dengan flag -d:
+
+      newman run collections\calculator_newman_chain_v3.json ^
+        -e collections\calculator_newman_chain_env_v2.json ^
+        -d collections\data-multiply.csv
+
+  Tiap baris CSV akan jadi 1 iteration. Total iteration = jumlah baris data.
+  Tabel ringkasan akan menampilkan iteration = 4 (sesuai jumlah baris).
+
+
+================================================================================
+  BAB 11  -  MENJALANKAN FOLDER/GROUP TERTENTU  (NEW)
+================================================================================
+
+  Collection bisa berisi banyak folder/group. Kadang kita hanya mau jalankan
+  satu group saja, misal untuk smoke test cepat.
+
+  ----------------------------------------------------------------------------
+  11.1  JALANKAN SATU FOLDER SAJA
+  ----------------------------------------------------------------------------
+
+  Misal collection punya folder: "Perkalian (Multiply)", "Pembagian (Divide)",
+  dst. Untuk run folder "Perkalian (Multiply)" saja:
+
+      newman run collections\calculator_newman_chain_v3.json ^
+        -e collections\calculator_newman_chain_env_v2.json ^
+        --folder "Perkalian (Multiply)"
+
+  Nama folder harus PERSIS sama (case sensitive, spasi & tanda baca harus
+  tepat) seperti yang ada di Postman / file collection JSON.
+
+  ----------------------------------------------------------------------------
+  11.2  JALANKAN BEBERAPA FOLDER
+  ----------------------------------------------------------------------------
+
+  Flag --folder bisa dipakai berkali-kali:
+
+      newman run collections\calculator_newman_chain_v3.json ^
+        -e collections\calculator_newman_chain_env_v2.json ^
+        --folder "Perkalian (Multiply)" ^
+        --folder "Pembagian (Divide)"
+
+  ----------------------------------------------------------------------------
+  11.3  HATI-HATI SAAT MENJALANKAN FOLDER TERPISAH
+  ----------------------------------------------------------------------------
+
+  Karena chaining bergantung pada variable dari request sebelumnya, kalau Anda
+  hanya run folder "Pembagian" tanpa "Perkalian", maka multiplyResult belum
+  pernah di-set -> error.
+
+  Solusi:
+    - Pastikan ada DEFAULT VALUE di file environment untuk variable tersebut,
+      atau
+    - Run dari awal (jangan skip folder yang men-set variable)
+
+
+================================================================================
+  BAB 12  -  EXPORT & IMPORT COLLECTION + ENVIRONMENT
+================================================================================
+
+  Newman membutuhkan file .json. File inilah yang di-export dari Postman, atau
+  sebaliknya di-import ke Postman agar bisa dilihat/diedit secara visual.
+
+  ----------------------------------------------------------------------------
+  12.1  EXPORT COLLECTION DARI POSTMAN
+  ----------------------------------------------------------------------------
+    1. Di sidebar, arahkan kursor ke nama collection
+    2. Klik ikon tiga titik ( ... ) di samping nama collection
+    3. Pilih "Export"
+    4. Pilih format "Collection v2.1 (recommended)"
+    5. Klik "Export", lalu simpan sebagai file .json
+
+  ----------------------------------------------------------------------------
+  12.2  EXPORT ENVIRONMENT DARI POSTMAN
+  ----------------------------------------------------------------------------
+    1. Klik menu "Environments" di sidebar kiri
+    2. Arahkan kursor ke nama environment yang diinginkan
+    3. Klik ikon tiga titik ( ... )
+    4. Pilih "Export"
+    5. Simpan sebagai file .json
+
+    Catatan: file collection dan environment adalah DUA file TERPISAH. Newman
+    membutuhkan keduanya (collection lewat argumen utama, environment lewat
+    flag --environment).
+
+  ----------------------------------------------------------------------------
+  12.3  IMPORT COLLECTION + ENVIRONMENT KE POSTMAN
+  ----------------------------------------------------------------------------
+
+    CARA A - Drag & Drop:
+      - Seret file .json langsung ke jendela Postman, klik Import.
+
+    CARA B - Lewat tombol Import:
+      1. Klik tombol "Import" (pojok kiri atas)
+      2. Pilih tab "File" -> "Choose Files"
+      3. Pilih file collection DAN file environment sekaligus (boleh dua-duanya)
+      4. Klik "Import"
+
+  ----------------------------------------------------------------------------
+  12.4  LANGKAH WAJIB SETELAH IMPORT: AKTIFKAN ENVIRONMENT
+  ----------------------------------------------------------------------------
+    1. Lihat dropdown di POJOK KANAN ATAS (defaultnya "No Environment")
+    2. Klik dan pilih environment yang sesuai
+       (misal: "Calculator Local Environment")
+    3. Tanpa langkah ini, variable {{...}} tidak terisi dan chain akan gagal.
+
+  ----------------------------------------------------------------------------
+  12.5  MENGECEK ISI VARIABLE DI POSTMAN
+  ----------------------------------------------------------------------------
+    - Klik ikon mata ( o ) di pojok kanan atas, ATAU
+    - Buka tab "Environments" -> pilih environment -> lihat kolom:
+          INITIAL VALUE   = nilai awal (ikut ter-export, dibagikan ke tim)
+          CURRENT VALUE   = nilai saat ini (lokal, hasil pm.environment.set)
+
+    PENTING: nilai dari pm.environment.set() masuk ke CURRENT VALUE, dan ini
+    TIDAK ikut ter-export. Jadi saat berbagi file environment, hanya INITIAL
+    VALUE yang terbawa.
+
+  ----------------------------------------------------------------------------
+  12.6  ALUR KERJA POSTMAN <-> NEWMAN
+  ----------------------------------------------------------------------------
+
+      [ Postman ]                          [ Newman / CLI ]
+          |                                       ^
+          | export collection.json                |
+          | export environment.json   ----------> | newman run collection.json
+          |                                        |   --environment environment.json
+          |  <---------- import -------------------|
+          | (lihat & edit secara visual)
+
+
+================================================================================
+  BAB 13  -  INTEGRASI NEWMAN DENGAN JENKINS CI/CD  (NEW)
+================================================================================
+
+  Project ini sudah ada folder jenkins-curl-test.bat dan jenkins-stop-app.bat,
+  jadi Newman tinggal di-plug ke pipeline yang sudah ada.
+
+  ----------------------------------------------------------------------------
+  13.1  CONTOH JENKINSFILE (DECLARATIVE PIPELINE)
+  ----------------------------------------------------------------------------
+
+      pipeline {
+        agent any
+
+        stages {
+          stage('Build') {
+            steps {
+              bat 'mvnw clean package'
+            }
+          }
+
+          stage('Start App') {
+            steps {
+              bat 'start /B java -jar target\\calculator-0.0.1-SNAPSHOT.jar'
+              bat 'timeout /T 15'
+            }
+          }
+
+          stage('API Test with Newman') {
+            steps {
+              bat '''
+                newman run collections\\calculator_newman_chain_v3.json ^
+                  -e collections\\calculator_newman_chain_env_v2.json ^
+                  -r cli,htmlextra,junit ^
+                  --reporter-htmlextra-export newman-reports\\report.html ^
+                  --reporter-junit-export newman-reports\\junit.xml
+              '''
+            }
+          }
+
+          stage('Stop App') {
+            steps {
+              bat 'jenkins-stop-app.bat'
+            }
+          }
+        }
+
+        post {
+          always {
+            junit 'newman-reports/junit.xml'
+            archiveArtifacts artifacts: 'newman-reports/**', allowEmptyArchive: true
+            publishHTML([
+              reportDir: 'newman-reports',
+              reportFiles: 'report.html',
+              reportName: 'Newman API Test Report',
+              keepAll: true
+            ])
+          }
+        }
+      }
+
+  ----------------------------------------------------------------------------
+  13.2  PLUGIN JENKINS YANG DIBUTUHKAN
+  ----------------------------------------------------------------------------
+    - JUnit Plugin             (untuk parse junit.xml)
+    - HTML Publisher Plugin    (untuk display report HTML di Jenkins)
+    - NodeJS Plugin            (kalau Jenkins agent belum ada Node.js)
+
+  ----------------------------------------------------------------------------
+  13.3  POIN PENTING UNTUK JENKINS
+  ----------------------------------------------------------------------------
+
+    1. Exit code Newman otomatis dibaca Jenkins. Failed test -> build FAILED.
+    2. Pakai flag --bail kalau mau STOP segera saat ada gagal (lebih cepat).
+    3. Pakai flag -x kalau mau build TETAP SUCCESS meski test gagal (jarang).
+    4. Path file collection di Jenkins sebaiknya RELATIVE (relatif workspace),
+       bukan absolute.
+    5. Hasil report sebaiknya disimpan sebagai artifact agar bisa di-download.
+
+  ----------------------------------------------------------------------------
+  13.4  CONTOH SCRIPT FREESTYLE JOB (CMD)
+  ----------------------------------------------------------------------------
+
+      @echo off
+      cd /d "%WORKSPACE%"
+
+      echo === Running Newman ===
+      newman run collections\calculator_newman_chain_v3.json ^
+        -e collections\calculator_newman_chain_env_v2.json ^
+        -r cli,htmlextra,junit ^
+        --reporter-htmlextra-export newman-reports\report.html ^
+        --reporter-junit-export newman-reports\junit.xml
+
+      if %ERRORLEVEL% NEQ 0 (
+        echo TEST GAGAL
+        exit /b %ERRORLEVEL%
+      )
+
+      echo === SEMUA TEST LULUS ===
+
+
+================================================================================
+  BAB 14  -  DEBUGGING & TIPS  (NEW)
+================================================================================
+
+  ----------------------------------------------------------------------------
+  14.1  CONSOLE.LOG UNTUK DEBUG SCRIPT
+  ----------------------------------------------------------------------------
+
+  Di dalam script (pre-request atau test), pakai console.log:
+
+      console.log("Nilai sekarang:", pm.environment.get("multiplyResult"));
+      console.log("Status:", pm.response.code);
+      console.log("Body:", pm.response.json());
+
+  DI POSTMAN: buka menu View -> Show Postman Console (Ctrl+Alt+C)
+  DI NEWMAN: log muncul di terminal saat pakai --verbose, atau di report HTML
+             saat pakai --reporter-htmlextra-logs
+
+  ----------------------------------------------------------------------------
+  14.2  CARA MELIHAT REQUEST/RESPONSE LENGKAP
+  ----------------------------------------------------------------------------
+
+  Pakai --verbose untuk lihat detail tiap request:
+
+      newman run collections\calculator_newman_chain_v3.json ^
+        -e collections\calculator_newman_chain_env_v2.json ^
+        --verbose
+
+  Output --verbose menampilkan:
+    - Request headers + body (resolved, setelah variable diisi)
+    - Response headers + body (full)
+    - Timing detail
+    - Console.log dari script
+
+  ----------------------------------------------------------------------------
+  14.3  EXPORT ENVIRONMENT SETELAH RUN
+  ----------------------------------------------------------------------------
+
+  Untuk lihat variable apa saja yang ter-set selama run:
+
+      newman run collections\calculator_newman_chain_v3.json ^
+        -e collections\calculator_newman_chain_env_v2.json ^
+        --export-environment newman-reports\env-after-run.json
+
+  Buka file hasilnya untuk lihat nilai akhir tiap variable.
+
+  ----------------------------------------------------------------------------
+  14.4  OVERRIDE VARIABLE DARI CLI
+  ----------------------------------------------------------------------------
+
+  Tanpa edit file env, ganti nilai variable lewat command line:
+
+      newman run collections\calculator_newman_chain_v3.json ^
+        -e collections\calculator_newman_chain_env_v2.json ^
+        --env-var "baseUrl=http://staging.calculator.com" ^
+        --env-var "apiKey=xyz123"
+
+  Berguna untuk:
+    - Switch antara local/staging/production tanpa edit file
+    - Inject secret dari CI/CD (Jenkins credentials)
+    - Test cepat dengan nilai berbeda
+
+  ----------------------------------------------------------------------------
+  14.5  CEK DULU SEBELUM RUN: PORT APLIKASI HIDUP
+  ----------------------------------------------------------------------------
+
+  Sebelum run Newman, pastikan aplikasi Spring Boot sudah jalan:
+
+      curl http://localhost:8080/api/calculator/add/1/1
+
+  Jika dapat response 200, aplikasi siap. Kalau "connection refused", aplikasi
+  belum start atau port-nya beda. Newman akan gagal dengan error ECONNREFUSED.
+
+
+================================================================================
+  BAB 15  -  TROUBLESHOOTING (ERROR YANG SERING MUNCUL)
+================================================================================
+
+  ----------------------------------------------------------------------------
+  ERROR 1
+  ----------------------------------------------------------------------------
+  Gejala :
+      "Cannot deserialize value of type double from Object value
+       (token JsonToken.START_OBJECT)"
+  Sebab  :
+      Variable {{...}} belum diisi, sehingga dikirim sebagai teks literal.
+      Tanda "{" dianggap awal object oleh server.
+  Solusi :
+      - Jalankan request pertama dulu (agar variable terisi), ATAU
+      - Gunakan Collection Runner / Newman (bukan Send manual per request).
+
+  ----------------------------------------------------------------------------
+  ERROR 2
+  ----------------------------------------------------------------------------
+  Gejala :
+      Hasil tidak berubah walau input diganti (misal tetap 18 padahal harusnya 21).
+  Sebab  :
+      Variable lama dari run sebelumnya masih tersimpan (tidak di-reset).
+  Solusi :
+      Tambahkan pm.environment.unset(...) di Pre-request request PERTAMA.
+
+  ----------------------------------------------------------------------------
+  ERROR 3
+  ----------------------------------------------------------------------------
+  Gejala :
+      Assertion "isSuccess = true" gagal: "expected undefined to be true".
+  Sebab  :
+      Nama field salah. Response memakai "success", bukan "isSuccess".
+  Solusi :
+      Gunakan pm.expect(jsonData.success).to.be.true;
+
+  ----------------------------------------------------------------------------
+  ERROR 4
+  ----------------------------------------------------------------------------
+  Gejala :
+      Chain putus, semua variable jadi undefined di tengah run.
+  Sebab  :
+      Script reset diletakkan di Collection-level Pre-request, sehingga jalan
+      sebelum SETIAP request (me-reset variable berulang kali).
+  Solusi :
+      Pindahkan script reset ke Pre-request milik request PERTAMA saja.
+
+  ----------------------------------------------------------------------------
+  ERROR 5
+  ----------------------------------------------------------------------------
+  Gejala :
+      Variable {{...}} tidak terisi saat run Newman.
+  Sebab  :
+      Lupa menyertakan flag -e / --environment.
+  Solusi :
+      Tambahkan: -e "path\ke\file_env.json"
+
+  ----------------------------------------------------------------------------
+  ERROR 6
+  ----------------------------------------------------------------------------
+  Gejala :
+      "connect ECONNREFUSED 127.0.0.1:8080"
+  Sebab  :
+      Aplikasi Spring Boot belum running, atau port-nya berbeda.
+  Solusi :
+      - Start aplikasi dulu (mvnw spring-boot:run atau jalankan .jar)
+      - Cek port di application.properties / application.yml
+      - Cek baseUrl di file environment cocok
+
+  ----------------------------------------------------------------------------
+  ERROR 7
+  ----------------------------------------------------------------------------
+  Gejala :
+      "newman: command not found" atau "is not recognized..."
+  Sebab  :
+      Newman belum terinstall, atau npm global path belum di PATH environment.
+  Solusi :
+      - npm install -g newman
+      - Restart terminal/CMD setelah install
+      - Cek: newman --version
+
+  ----------------------------------------------------------------------------
+  ERROR 8
+  ----------------------------------------------------------------------------
+  Gejala :
+      "Could not find HTML reporter htmlextra"
+  Sebab  :
+      newman-reporter-htmlextra belum terinstall.
+  Solusi :
+      npm install -g newman-reporter-htmlextra
+
+  ----------------------------------------------------------------------------
+  ERROR 9
+  ----------------------------------------------------------------------------
+  Gejala :
+      Test SUKSES di Postman tapi GAGAL di Newman (atau sebaliknya).
+  Sebab  :
+      Perbedaan versi schema, atau Postman pakai feature yang belum support
+      di Newman versi tertentu.
+  Solusi :
+      - Export ulang dengan format "Collection v2.1 (recommended)"
+      - Update Newman ke versi terbaru: npm install -g newman@latest
+      - Cek release note Newman untuk feature support
+
+
+================================================================================
+  BAB 16  -  BEST PRACTICES  (NEW)
+================================================================================
+
+  Tips dari pengalaman membangun & menjalankan banyak collection:
+
+  ----------------------------------------------------------------------------
+  16.1  STRUKTUR COLLECTION
+  ----------------------------------------------------------------------------
+    - Kelompokkan request ke FOLDER berdasarkan fitur atau modul
+    - Beri nomor di nama request supaya urutan jelas (1a, 1b, 1c, dst)
+    - Pakai nama yang deskriptif: bukan "Test 1" tapi "POST Multiply (Body)"
+    - Letakkan request reset/cleanup di awal & akhir collection
+
+  ----------------------------------------------------------------------------
+  16.2  ENVIRONMENT VARIABLE
+  ----------------------------------------------------------------------------
+    - SEMUA URL pakai variable {{baseUrl}}, jangan hardcode
+    - Buat environment terpisah untuk Local, Staging, Production
+    - Jangan simpan SECRET (password, API key) di INITIAL VALUE (ikut export)
+      Simpan di CURRENT VALUE atau inject via --env-var saat run
+    - Beri nama variable yang konsisten: snake_case atau camelCase, pilih satu
+
+  ----------------------------------------------------------------------------
+  16.3  SCRIPT
+  ----------------------------------------------------------------------------
+    - Pisahkan logic reset (Pre-request request #1) dari logic chain (Tests)
+    - Pakai console.log untuk debug, hapus saat sudah stabil
+    - Test assertion harus SPESIFIK: bukan "ada response" tapi "payload = 50"
+    - Beri pesan jelas di pm.test() supaya mudah baca laporan
+
+  ----------------------------------------------------------------------------
+  16.4  COLLECTION DI-VERSION CONTROL
+  ----------------------------------------------------------------------------
+    - Commit file collection .json ke Git bersama kode aplikasi
+    - Gunakan format v2.1 (lebih stabil untuk diff)
+    - Folder collections/ jadi bagian dari repo
+    - File env yang berisi secret jangan ikut commit (masukkan ke .gitignore)
+      Buat template env tanpa secret untuk dipakai tim
+
+  ----------------------------------------------------------------------------
+  16.5  CI/CD
+  ----------------------------------------------------------------------------
+    - Selalu generate HTML report untuk dokumentasi visual
+    - Selalu generate JUnit report untuk parsing native CI
+    - Set timeout yang reasonable (--timeout-request 30000)
+    - Pakai --bail di pipeline kritis (stop segera saat gagal)
+    - Archive folder newman-reports/ sebagai build artifact
+
+  ----------------------------------------------------------------------------
+  16.6  PERFORMANCE
+  ----------------------------------------------------------------------------
+    - Untuk testing fungsional: tidak perlu --delay-request
+    - Untuk testing rate limit / throttling: pakai --delay-request
+    - Untuk load testing: PAKAI JMETER atau K6, JANGAN Newman
+      Newman bukan untuk load testing (sequential only)
+
+
+================================================================================
+  BAB 17  -  CHEAT SHEET (RINGKASAN CEPAT)
+================================================================================
+
+  PERINTAH SCRIPT:
+      pm.environment.set("nama", nilai)    -> simpan ke env
+      pm.environment.get("nama")           -> baca dari env
+      pm.environment.unset("nama")         -> hapus dari env
+      pm.globals.set/get/unset             -> sama tapi scope global
+      pm.collectionVariables.set/get       -> scope collection
+      pm.iterationData.get("kolom")        -> baca dari CSV/JSON data
+      pm.response.json()                   -> parse body JSON
+      pm.response.code                     -> status code
+      pm.expect(x).to.eql(y)               -> assertion equal
+      pm.test("Nama", function() {...})    -> wrapper test
+      {{nama}}                             -> pakai di body/url/header
+
+  ATURAN EMAS:
+      1. Simpan hasil di tab Tests / Post-response.
+      2. Pakai variable di body lewat {{...}}.
+      3. Reset variable hanya di Pre-request request PERTAMA.
+      4. Request berantai HARUS via Collection Runner / Newman.
+      5. Cek nama field response (success, bukan isSuccess).
+      6. Fan-in: pakai nama variable berbeda untuk tiap sumber.
+
+  PERINTAH NEWMAN PALING SERING DIPAKAI:
+
+      # Run dasar
+      newman run collection.json -e env.json
+
+      # Run + report HTML
+      newman run collection.json -e env.json ^
+        -r cli,htmlextra --reporter-htmlextra-export report.html
+
+      # Run + multiple reports
+      newman run collection.json -e env.json ^
+        -r cli,htmlextra,json,junit ^
+        --reporter-htmlextra-export report.html ^
+        --reporter-json-export result.json ^
+        --reporter-junit-export junit.xml
+
+      # Run satu folder saja
+      newman run collection.json -e env.json --folder "Perkalian (Multiply)"
+
+      # Run dengan data CSV
+      newman run collection.json -e env.json -d data.csv
+
+      # Run berulang 3 kali
+      newman run collection.json -e env.json -n 3
+
+      # Run dengan override variable
+      newman run collection.json -e env.json --env-var "baseUrl=http://staging.com"
+
+      # Run dengan delay & timeout
+      newman run collection.json -e env.json --delay-request 500 --timeout-request 10000
+
+      # Run + stop saat gagal
+      newman run collection.json -e env.json --bail
+
+  4 LANGKAH GENERATE HTML REPORT:
+      1. npm install -g newman-reporter-htmlextra   (sekali saja)
+      2. newman run ... -r cli,htmlextra --reporter-htmlextra-export report.html
+      3. file otomatis dibuat di path yang ditentukan
+      4. start report.html (buka di browser)
+
+  URUTAN KERJA LENGKAP:
+      Install Node.js
+        -> npm install -g newman
+        -> npm install -g newman-reporter-htmlextra
+        -> Buat collection di Postman (atau import)
+        -> Setup environment variable
+        -> Tulis pre-request & test script
+        -> Export collection + environment sebagai .json
+        -> newman run <collection> -e <env> -r cli,htmlextra ...
+        -> Buka report HTML
+        -> (Opsional) Integrasi ke Jenkins / CI/CD
+
+
+================================================================================
+  Selesai. Selamat mencoba!
+  Studi kasus: Project Calculator API - Newman v6.2.2
+  Path project: D:\AI\test1\jenkins\calculatorLengkap
+  Update terakhir: Juni 2026
+================================================================================
